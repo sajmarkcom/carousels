@@ -286,7 +286,7 @@ def finish(img, path):
 
 # ---------- slides ----------
 def ab_base(v, mirror=False):
-    img = (light_bg() if v == 'A' else deep_bg()).convert('RGBA')
+    img = (light_bg() if v == 'A' else brand_bg()).convert('RGBA')   # brand gradient kept soft; white titles get a soft shadow instead
     arcs(img, V1 if v == 'A' else WHITE, V2 if v == 'A' else WHITE, 0.3 if v == 'A' else 0.28, mirror)
     return img
 
