@@ -23,6 +23,10 @@ V1, V2 = (0xBC, 0x89, 0xFF), (0x5C, 0xE1, 0xE6)
 T1, T2 = (0x9B, 0x5C, 0xFF), (0x1F, 0xB5, 0xBC)
 # B backgrounds: same hues, one step deeper, so white titles keep contrast at the turquoise end.
 B1, B2 = (0xA2, 0x6C, 0xF7), (0x2F, 0xBC, 0xC8)
+# B background since 22/10/2026 (same as the Reels): a bit deeper in the middle, light turquoise at the end,
+# plus a soft blue veil behind the white text block. Sullivan refused anything darker or more violet.
+BG_B = ((0, (0xB0, 0x7E, 0xFC)), (0.55, (0x8A, 0xA6, 0xEE)), (1, (0x5C, 0xD9, 0xE3)))
+VEIL, VEIL_A = (30, 70, 160), 0.36
 INK, BODY = (20, 20, 20), (61, 61, 61)
 WHITE = (255, 255, 255)
 _fonts = {}
@@ -68,6 +72,17 @@ def light_bg():
 
 def brand_bg():
     return gradient(s(W), s(H), 150)
+
+def b_bg():
+    return gradient(s(W), s(H), 150, BG_B)
+
+def veil(img, cx, cy):
+    """Soft blue ellipse (85% x 32% of the slide, linear falloff) centred on the text block, in slide px."""
+    ys, xs = np.mgrid[0:img.height, 0:img.width].astype(np.float32)
+    r = np.sqrt(((xs - s(cx)) / s(W * 0.85)) ** 2 + ((ys - s(cy)) / s(H * 0.32)) ** 2)
+    a = (np.clip(1 - r, 0, 1) * VEIL_A * 255).astype(np.uint8)
+    lay = Image.new('RGBA', img.size, VEIL + (0,)); lay.putalpha(Image.fromarray(a, 'L'))
+    img.alpha_composite(lay)
 
 def deep_bg():
     return gradient(s(W), s(H), 150, ((0, B1), (1, B2)))
@@ -286,7 +301,7 @@ def finish(img, path):
 
 # ---------- slides ----------
 def ab_base(v, mirror=False):
-    img = (light_bg() if v == 'A' else brand_bg()).convert('RGBA')   # brand gradient kept soft; white titles get a soft shadow instead
+    img = (light_bg() if v == 'A' else b_bg()).convert('RGBA')   # white titles also get a soft shadow and a veil (see veil)
     arcs(img, V1 if v == 'A' else WHITE, V2 if v == 'A' else WHITE, 0.3 if v == 'A' else 0.28, mirror)
     return img
 
@@ -315,6 +330,7 @@ def cover_ab(v, spec):
         if total <= s(y1 - y0) or k < 0.5: break
         k *= 0.95
     y = place(total, y0, y1, (top + bottom) / 2)
+    if v == 'B': veil(img, 88 + block_w(t) / 2, (y + ph + s(36) + t['h'] / 2) / S)
     pill(img, spec['pill'], s(88), y, 26, 'outline' if v == 'A' else 'white')
     draw_block(img, t, s(88), y + ph + s(36), ink, 'gradient' if v == 'A' else 'plain', glow=(v == 'B'))
     return img
@@ -396,6 +412,9 @@ def content_ab(v, spec, idx, k, top):
     sl = spec['slides'][idx - 2]; img = ab_base(v, mirror=mirror)
     ink = INK if v == 'A' else WHITE; body = BODY if v == 'A' else WHITE
     blocks = ab_blocks(v, sl, k, spec)
+    if v == 'B':
+        bw = max(block_w(b) for b in blocks if isinstance(b, dict))
+        veil(img, 88 + bw / 2, (top + stack_h(blocks) / 2) / S)
     y = top
     for b in blocks:
         if isinstance(b, dict):
@@ -439,6 +458,7 @@ def cta_ab(v, spec):
     # [0, safe_h] alone leaves the reserved margin as pure extra weight at the very bottom,
     # since it sits outside the centred band entirely (the same imbalance content_ab had).
     y = place(total, 0, safe_h, H / 2)
+    if v == 'B': veil(img, W / 2, (y + total / 2) / S)
     for i, b in enumerate(blocks):
         if i == 0:
             _, lh = paste_logo(img, 'gradient' if v == 'A' else 'white', b, cx=W / 2, top=y / S); y += lh
